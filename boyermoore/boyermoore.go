@@ -54,7 +54,7 @@ func (s *state) find() (found bool, offset int64, err error) {
 		if b[0] == s.search[0] {
 			// if we good byte, add it to good suffix
 			if s.suffixes == nil {
-				s.suffixes = make([]string, 0)
+				s.suffixes = make([]string, 1)
 			}
 			s.suffixes = append(s.suffixes, string(s.search[i:]))
 		}
@@ -82,6 +82,8 @@ func (s *state) move(badOffset int, badCharacter byte) {
 				goodStep = s
 			}
 		}
+		// clean up old stuff
+		s.suffixes = s.suffixes[:0]
 	}
 	switch {
 	case badOffset == -1:
@@ -97,8 +99,6 @@ func (s *state) move(badOffset int, badCharacter byte) {
 		fmt.Printf("%v move %d\n", s, moveStep)
 	}
 	s.offset, s.err = s.r.Seek(int64(moveStep), 1)
-	// clean up old stuff
-	s.suffixes = nil
 }
 
 // just for debug
