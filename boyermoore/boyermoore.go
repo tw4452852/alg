@@ -1,7 +1,6 @@
 package boyermoore
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 )
@@ -9,102 +8,66 @@ import (
 // state log the progress when searching
 type state struct {
 	table    *moveTable
-	source   string        // the source text
-	r        *bytes.Reader // the source text reader
-	search   []byte        // the search word
-	err      error         // error when searching
-	suffixes []string      // good suffixes when searching
-	offset   int64         // current offset of reader
+	source   []byte   // the source text
+	search   []byte   // the search word
+	suffixes []string // good suffixes when searching
+	offset   int      // current offset of reader
 }
 
 func newState(source, search string) *state {
 	return &state{
 		table:  newMoveTable(search),
-		source: source,
-		r:      bytes.NewReader([]byte(source)),
+		source: []byte(source),
 		search: []byte(search),
 	}
 }
 
 // move offset of source until reach the end
 // if there is error happened, return it
-func (s *state) find() (found bool, offset int64, err error) {
-	// if error already happened, can't move ahead
-	if s.err != nil {
-		err = s.err
+func (s *state) find() (found bool, offset int, err error) {
+	// out of range
+	if s.offset+len(s.search) > len(s.source) {
+		err = io.EOF
 		return
 	}
-	b := make([]byte, 1)
 
 	var i int
 	for i = len(s.search) - 1; i >= 0; i-- {
-		_, err = s.r.ReadAt(b, s.offset+int64(i))
-		if err != nil {
-			s.err = err
-			return
-		}
-		if b[0] != s.search[i] {
+		if s.source[s.offset+i] != s.search[i] {
 			break
 		}
 		if i == 0 {
 			found = true
-			break
+			continue
 		}
-		// the good character must at the begining
-		if b[0] == s.search[0] {
-			// if we good byte, add it to good suffix
-			if s.suffixes == nil {
-				s.suffixes = make([]string, 1)
-			}
-			s.suffixes = append(s.suffixes, string(s.search[i:]))
-		}
-
-		b = b[0:1]
 	}
 	if found {
 		offset = s.offset
 	}
-	// if we not found, move the source
-	s.move(i, b[0])
+	s.move(i, s.source[s.offset+i])
 	return
 }
 
 // move the source to prepare next finding
 func (s *state) move(badOffset int, badCharacter byte) {
-	moveStep := 0
-	badStep := s.table.badStep(rune(badCharacter), badOffset)
-	goodStep := -1
-	if s.suffixes != nil {
-		// find the max good step
-		for _, suffix := range s.suffixes {
-			s := s.table.goodStep(suffix)
-			if s > goodStep {
-				goodStep = s
-			}
-		}
-		// clean up old stuff
-		s.suffixes = s.suffixes[:0]
-	}
-	switch {
-	case badOffset == -1:
+	var moveStep int
+	if badOffset == -1 {
 		moveStep = len(s.search)
-	case badStep > goodStep:
-		moveStep = badStep
-	default:
-		moveStep = goodStep
+	} else {
+		moveStep = s.table.maxStep(badCharacter, badOffset)
 	}
 	if false {
-		fmt.Printf("badOffset:%d, badCharacter:%c, bad:%d, good:%d\n",
-			badOffset, badCharacter, badStep, goodStep)
+		fmt.Printf("badOffset:%d, badCharacter:%c\n",
+			badOffset, badCharacter)
 		fmt.Printf("%v move %d\n", s, moveStep)
 	}
-	s.offset, s.err = s.r.Seek(int64(moveStep), 1)
+	s.offset += moveStep
 }
 
 // just for debug
 func (s *state) String() string {
-	return fmt.Sprintf("source(%q), search(%q), offset(%d), err(%v), suffixes(%v)",
-		s.source, string(s.search), s.offset, s.err, s.suffixes)
+	return fmt.Sprintf("source(%q), search(%q), offset(%d), suffixes(%v)",
+		s.source, s.search, s.offset, s.suffixes)
 }
 
 // return the first offset in the source text
@@ -114,7 +77,7 @@ func SearchOne(source, search string) int64 {
 	for {
 		found, offset, err := s.find()
 		if found {
-			return offset
+			return int64(offset)
 		}
 		if err != nil {
 			return -1
@@ -131,7 +94,7 @@ func SearchAll(source, search string) []int64 {
 	for {
 		found, offset, err := s.find()
 		if found {
-			offsets = append(offsets, offset)
+			offsets = append(offsets, int64(offset))
 			continue
 		}
 		if err != nil {

@@ -1,6 +1,7 @@
 package boyermoore
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -14,27 +15,22 @@ func TestMoveTable(t *testing.T) {
 		tableCase{
 			s: "example",
 			t: &moveTable{
-				source: "example",
-				good: map[string]int{
-					"e": 6,
-				},
+				source: []byte("example"),
+				good:   []int{0, -1, -1, -1, -1, -1, 6},
 			},
 		},
 		tableCase{
 			s: "",
 			t: &moveTable{
-				source: "",
-				good:   map[string]int{},
+				source: []byte(""),
+				good:   []int{},
 			},
 		},
 		tableCase{
 			s: "eeiee",
 			t: &moveTable{
-				source: "eeiee",
-				good: map[string]int{
-					"e":  4,
-					"ee": 3,
-				},
+				source: []byte("eeiee"),
+				good:   []int{0, -1, -1, 3, 4},
 			},
 		},
 	}
@@ -46,7 +42,7 @@ func TestMoveTable(t *testing.T) {
 }
 
 func checkMoveTable(expect, got *moveTable, t *testing.T) {
-	if expect.source != got.source {
+	if !reflect.DeepEqual(expect.source, got.source) {
 		t.Errorf("source check failed: expect %q, got %q\n",
 			expect.source, got.source)
 	}
@@ -67,9 +63,9 @@ func checkMoveTable(expect, got *moveTable, t *testing.T) {
 
 func TestStep(t *testing.T) {
 	type stepExpect struct {
-		suffix       string
+		suffix       int
 		suffixStep   int
-		badCharacter rune
+		badCharacter byte
 		badPosition  int
 		badStep      int
 	}
@@ -83,9 +79,8 @@ func TestStep(t *testing.T) {
 		stepCase{
 			s: "exaeple",
 			expects: []stepExpect{
-				stepExpect{"e", 6, 's', 6, 7},
-				stepExpect{"le", -1, 'p', 6, 2},
-				stepExpect{"ple", -1, 'e', 4, 1},
+				stepExpect{6, 6, 's', 6, 7},
+				stepExpect{5, -1, 'p', 6, 2},
 			},
 		},
 	}

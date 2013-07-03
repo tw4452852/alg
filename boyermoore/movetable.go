@@ -1,47 +1,74 @@
 package boyermoore
 
 import (
-	"strings"
+	"bytes"
 )
 
 // precount a moveable table used when searching
 type moveTable struct {
-	source string         // source string
-	good   map[string]int // good suffix moveable table
+	source []byte   // source string
+	bad    [256]int // bad character array
+	good   []int    // good suffix moveable table
 }
 
 // generate table according to the origin string
-func newMoveTable(s string) *moveTable {
-	good := make(map[string]int)
+func newMoveTable(str string) *moveTable {
+	s := []byte(str)
+	good := make([]int, len(s))
 
 	for i := len(s) - 1; i > 0; i-- {
 		suffix := s[i:]
 		prefix := s[:len(suffix)]
 		preIndex := len(prefix) - 1
-		if strings.EqualFold(suffix, prefix) {
-			good[string(suffix)] = len(s) - 1 - preIndex
+		if bytes.Compare(suffix, prefix) == 0 {
+			good[i] = len(s) - 1 - preIndex
+		} else {
+			good[i] = -1
 		}
 	}
 
-	return &moveTable{
+	t := &moveTable{
 		source: s,
 		good:   good,
 	}
+
+	for i, b := range s {
+		t.bad[b] = i
+	}
+	return t
 }
 
 // return good suffix move step count
 // if not a good suffix, return -1
-func (m *moveTable) goodStep(suffix string) int {
-	if step, found := m.good[suffix]; found {
-		return step
+func (m *moveTable) goodStep(position int) int {
+	if 0 <= position && position < len(m.source) {
+		return m.good[position]
 	}
 	return -1
 }
 
 // return bad character move step count
-func (m *moveTable) badStep(badCharacter rune, badPosition int) int {
-	if badPosition > len(m.source)-1 {
-		panic("bad position")
+func (m *moveTable) badStep(badCharacter byte, badPosition int) int {
+	if bytes.IndexByte(m.source[:badPosition], badCharacter) == -1 {
+		return badPosition + 1
 	}
-	return badPosition - strings.LastIndex(m.source[:badPosition], string(badCharacter))
+	return badPosition - m.bad[badCharacter]
+}
+
+// return the maximun of good and bad step
+func (m *moveTable) maxStep(badCharacter byte, badPosition int) int {
+	bad := m.badStep(badCharacter, badPosition)
+
+	var good int
+	for i := badPosition + 1; i < len(m.source); i++ {
+		step := m.goodStep(i)
+		if step > good {
+			good = step
+		}
+	}
+
+	if bad > good {
+		return bad
+	}
+	return good
 }
